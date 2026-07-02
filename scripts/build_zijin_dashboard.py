@@ -11,7 +11,7 @@ CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "outputs" / "index.html"
 TS_CODE = "601899.SH"
 START_DATE = "20160613"
-END_DATE = "20260612"
+END_DATE = "20260702"
 
 
 def get_token():
@@ -65,13 +65,13 @@ def build_data(token):
         token,
         "daily_basic",
         {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
-        "trade_date,close,turnover_rate,pe_ttm,pb,dv_ttm,total_mv",
+        "trade_date,close,turnover_rate,pe_ttm,pb,dv_ttm,total_mv,float_share",
     )
     quotes = call_api(
         token,
         "daily",
         {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
-        "trade_date,amount",
+        "trade_date,close,vol,amount",
     )
     moneyflows = call_api(
         token,
@@ -178,6 +178,8 @@ def build_data(token):
     )
 
     factor_by_date = {row["trade_date"]: row["adj_factor"] for row in factors}
+    quote_by_date = {row["trade_date"]: row for row in quotes}
+    basic_by_date = {row["trade_date"]: row for row in daily}
     amount_by_date = {row["trade_date"]: row.get("amount") for row in quotes}
     moneyflow_by_date = {row["trade_date"]: row for row in moneyflows}
     margin_by_date = {row["trade_date"]: row for row in margins}
@@ -223,6 +225,67 @@ def build_data(token):
                     (margin.get("rzmre") or 0) / (amount * 1000) * 100, 3
                     if amount
                     else 0,
+                ),
+            }
+        )
+    last_basic_date = max(basic_by_date)
+    for trade_date in sorted(date for date in quote_by_date if date > last_basic_date):
+        quote = quote_by_date[trade_date]
+        previous_basic = basic_by_date[last_basic_date]
+        previous_series = series[-1]
+        previous_close = previous_basic.get("close") or previous_series["p"]
+        close = quote.get("close") or previous_close
+        price_ratio = close / previous_close if previous_close else 1
+        factor = factor_by_date.get(trade_date) or latest_factor
+        amount = quote.get("amount") or 0
+        moneyflow = moneyflow_by_date.get(trade_date, {})
+        margin = margin_by_date.get(trade_date, {})
+        float_share = previous_basic.get("float_share") or 0
+        turnover_rate = (
+            (quote.get("vol") or 0) / float_share
+            if float_share and quote.get("vol")
+            else previous_basic.get("turnover_rate") or previous_series["turn"]
+        )
+        pe = (previous_basic.get("pe_ttm") or previous_series["pe"]) * price_ratio
+        pb = (previous_basic.get("pb") or previous_series["pb"]) * price_ratio
+        dividend_yield = (previous_basic.get("dv_ttm") or previous_series["dy"]) / price_ratio
+        market_cap = (previous_basic.get("total_mv") or 0) * price_ratio
+        rzye = (
+            round((margin.get("rzye") or 0) / 100000000, 3)
+            if margin
+            else previous_series["rzye"]
+        )
+        series.append(
+            {
+                "d": f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}",
+                "p": round(close * factor / latest_factor, 3),
+                "n": round(market_cap / pe / 10000, 2) if pe else previous_series["n"],
+                "pe": round(pe, 3),
+                "pb": round(pb, 3),
+                "dy": round(dividend_yield, 3),
+                "turn": round(turnover_rate or 0, 3),
+                "amount": round(amount / 100000, 3),
+                "small": round(
+                    ((moneyflow.get("buy_sm_amount") or 0) - (moneyflow.get("sell_sm_amount") or 0))
+                    / 10000,
+                    3,
+                ),
+                "large": round(
+                    (
+                        (moneyflow.get("buy_lg_amount") or 0)
+                        + (moneyflow.get("buy_elg_amount") or 0)
+                        - (moneyflow.get("sell_lg_amount") or 0)
+                        - (moneyflow.get("sell_elg_amount") or 0)
+                    )
+                    / 10000,
+                    3,
+                ),
+                "rzye": rzye,
+                "rzbuy": round(
+                    (margin.get("rzmre") or 0) / (amount * 1000) * 100
+                    if margin and amount
+                    else 0,
+                    3,
                 ),
             }
         )
@@ -284,29 +347,33 @@ def build_data(token):
 
     dividend_events = []
     used_dividends = set()
-    for row in sorted(dividends, key=lambda item: item["ann_date"], reverse=True):
+    for row in sorted(dividends, key=lambda item: item.get("ann_date") or "", reverse=True):
+        if not row.get("end_date"):
+            continue
         key = (row["end_date"], row.get("cash_div_tax"))
         if key in used_dividends:
             continue
         used_dividends.add(key)
+        event_date = row.get("ann_date") or row["end_date"]
         dividend_events.append(
             {
-                "date": row["ann_date"],
+                "date": event_date,
                 "text": f"{row['end_date'][:4]}年分红方案：每股现金 {row.get('cash_div_tax') or 0:.2f} 元（{row.get('div_proc') or '待定'}）",
             }
         )
 
     forecast_events = []
     used_forecasts = set()
-    for row in sorted(forecasts, key=lambda item: item["ann_date"], reverse=True):
-        if row["end_date"] in used_forecasts:
+    for row in sorted(forecasts, key=lambda item: item.get("ann_date") or "", reverse=True):
+        if not row.get("end_date") or row["end_date"] in used_forecasts:
             continue
         used_forecasts.add(row["end_date"])
+        event_date = row.get("ann_date") or row["end_date"]
         low = (row.get("net_profit_min") or 0) / 10000
         high = (row.get("net_profit_max") or low * 10000) / 10000
         forecast_events.append(
             {
-                "date": row["ann_date"],
+                "date": event_date,
                 "text": f"{row['end_date'][:4]}年业绩{row.get('type') or '预告'}：归母净利润约 {low:.0f}–{high:.0f} 亿元",
             }
         )
@@ -453,7 +520,9 @@ def build_data(token):
 
     repurchase_series = []
     seen_repurchase = set()
-    for row in sorted(repurchases, key=lambda item: item["ann_date"]):
+    for row in sorted(repurchases, key=lambda item: item.get("ann_date") or ""):
+        if not row.get("ann_date"):
+            continue
         key = (row["ann_date"], row.get("proc"), row.get("amount"))
         if key in seen_repurchase:
             continue
@@ -469,7 +538,9 @@ def build_data(token):
 
     holder_trade_series = []
     cumulative_trade = 0
-    for row in sorted(holder_trades, key=lambda item: item["ann_date"]):
+    for row in sorted(holder_trades, key=lambda item: item.get("ann_date") or ""):
+        if not row.get("ann_date"):
+            continue
         signed_ratio = (row.get("change_ratio") or 0) * (1 if row.get("in_de") == "IN" else -1)
         cumulative_trade += signed_ratio
         holder_trade_series.append(
