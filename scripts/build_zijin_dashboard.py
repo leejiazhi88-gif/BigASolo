@@ -9,9 +9,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "outputs" / "index.html"
-TS_CODE = "601899.SH"
 START_DATE = "20160613"
-END_DATE = "20260702"
+END_DATE = "20260708"
+STOCKS = [
+    {"code": "601899.SH", "name": "紫金矿业"},
+    {"code": "600036.SH", "name": "招商银行"},
+    {"code": "603986.SH", "name": "兆易创新"},
+    {"code": "300408.SZ", "name": "三环集团"},
+    {"code": "002463.SZ", "name": "沪电股份"},
+]
 
 
 def get_token():
@@ -60,59 +66,60 @@ def quarter_periods(start_year=2016, end_year=2026):
     return periods
 
 
-def build_data(token):
+def build_data(token, stock):
+    ts_code = stock["code"]
     daily = call_api(
         token,
         "daily_basic",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,close,turnover_rate,pe_ttm,pb,dv_ttm,total_mv,float_share",
     )
     quotes = call_api(
         token,
         "daily",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,close,vol,amount",
     )
     moneyflows = call_api(
         token,
         "moneyflow",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,buy_sm_amount,sell_sm_amount,buy_lg_amount,sell_lg_amount,buy_elg_amount,sell_elg_amount,net_mf_amount",
     )
     margins = call_api(
         token,
         "margin_detail",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,rzye,rzmre,rzche",
     )
     holders = call_api(
         token,
         "stk_holdernumber",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "ann_date,end_date,holder_num",
     )
     hk_holds = call_api(
         token,
         "hk_hold",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,vol,ratio",
     )
     float_holders = call_api(
         token,
         "top10_floatholders",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "ann_date,end_date,holder_name,hold_amount,hold_ratio,hold_float_ratio,hold_change,holder_type",
     )
     top_holders = call_api(
         token,
         "top10_holders",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "ann_date,end_date,holder_name,hold_amount,hold_ratio,hold_change,holder_type",
     )
     holder_trades = call_api(
         token,
         "stk_holdertrade",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "ann_date,holder_name,holder_type,in_de,change_vol,change_ratio,after_share,after_ratio,avg_price,begin_date,close_date",
     )
     all_repurchase = call_api(
@@ -121,7 +128,7 @@ def build_data(token):
         {"start_date": START_DATE, "end_date": END_DATE},
         "ts_code,ann_date,end_date,proc,exp_date,vol,amount,high_limit,low_limit",
     )
-    repurchases = [row for row in all_repurchase if row.get("ts_code") == TS_CODE]
+    repurchases = [row for row in all_repurchase if row.get("ts_code") == ts_code]
     lpr_rows = call_api(
         token,
         "shibor_lpr",
@@ -133,7 +140,7 @@ def build_data(token):
         rows = call_api(
             token,
             "fund_portfolio",
-            {"period": period, "symbol": TS_CODE},
+            {"period": period, "symbol": ts_code},
             "ann_date,end_date,ts_code,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio",
         )
         if not rows:
@@ -155,25 +162,25 @@ def build_data(token):
     factors = call_api(
         token,
         "adj_factor",
-        {"ts_code": TS_CODE, "start_date": START_DATE, "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": START_DATE, "end_date": END_DATE},
         "trade_date,adj_factor",
     )
     reports = call_api(
         token,
         "report_rc",
-        {"ts_code": TS_CODE, "start_date": "20260301", "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": "20260301", "end_date": END_DATE},
         "report_date,report_title,org_name,quarter,np,eps,pe,rating,min_price,max_price",
     )
     dividends = call_api(
         token,
         "dividend",
-        {"ts_code": TS_CODE},
+        {"ts_code": ts_code},
         "end_date,ann_date,div_proc,cash_div_tax,record_date,ex_date,pay_date",
     )
     forecasts = call_api(
         token,
         "forecast",
-        {"ts_code": TS_CODE, "start_date": "20240101", "end_date": END_DATE},
+        {"ts_code": ts_code, "start_date": "20240101", "end_date": END_DATE},
         "ann_date,end_date,type,p_change_min,p_change_max,net_profit_min,net_profit_max,summary,change_reason",
     )
 
@@ -332,7 +339,7 @@ def build_data(token):
     seen_titles = set()
     for row in sorted(reports, key=lambda item: item["report_date"], reverse=True):
         title = row.get("report_title")
-        if title and "紫金矿业" in title and title not in seen_titles:
+        if title and stock["name"] in title and title not in seen_titles:
             seen_titles.add(title)
             recent_reports.append(
                 {
@@ -648,6 +655,12 @@ def build_data(token):
         )
 
     return {
+        "meta": {
+            "code": stock["code"],
+            "name": stock["name"],
+            "end_date": f"{END_DATE[:4]}-{END_DATE[4:6]}-{END_DATE[6:]}",
+            "latest_date": latest["d"],
+        },
         "series": series,
         "latest": latest,
         "consensus": consensus,
@@ -676,11 +689,12 @@ def build_data(token):
 HTML = r"""<!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>紫金矿业研究面板</title>
+<title>多股票研究面板</title>
 <style>
 :root{--bg:#071019;--panel:#0b1723;--line:#203141;--text:#eaf2f8;--muted:#8294a6;--cyan:#42d3ff;--gold:#ffb547;--purple:#c792ff;--green:#40df9a;--red:#ff6b7d}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#11283a 0,transparent 36%),var(--bg);color:var(--text);font-family:Inter,"Microsoft YaHei",system-ui,sans-serif}
 .wrap{width:100%;max-width:1500px;margin:auto;padding:24px;overflow:hidden}.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-end}.header h1{font-size:27px;margin:0 0 6px}.muted{color:var(--muted)}.badge{border:1px solid #284052;border-radius:999px;padding:8px 12px;color:#a8bac8;font-size:12px;white-space:nowrap}
+.stock-panel{margin:18px 0 6px;padding:13px 15px;border:1px solid #1d3445;background:#091522;border-radius:12px}.stock-row{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}.stock-checks,.stock-tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.stock-check{display:flex;align-items:center;gap:7px;border:1px solid #243847;border-radius:999px;padding:7px 10px;color:#b7c6d2;font-size:12px;background:#0f1d2a}.stock-check input{accent-color:#42d3ff}.stock-tabs button.active{background:#42d3ff;border-color:#42d3ff;color:#06111a;font-weight:800}.stock-tabs button:disabled{opacity:.45;cursor:not-allowed}
 .nav{display:flex;gap:6px;margin:20px 0 14px;border-bottom:1px solid #193040}.nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:10px 18px}.nav button.active{color:#fff;border-color:var(--cyan)}
 button{background:#101f2c;color:#9eb0be;border:1px solid #243847;border-radius:8px;padding:7px 11px;cursor:pointer}button:hover,button.active{color:#fff;border-color:#3b6077;background:#173044}
 .page{display:block;min-width:0;scroll-margin-top:12px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.card,.panel{min-width:0;background:linear-gradient(145deg,#0e1d2a,#09131e);border:1px solid #1b2c3a;border-radius:14px;padding:15px}
@@ -695,9 +709,15 @@ button{background:#101f2c;color:#9eb0be;border:1px solid #243847;border-radius:8
 table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #193040;vertical-align:top}th{color:#7890a3;font-weight:600}
 .foot{color:#6f8495;font-size:11px;line-height:1.6;padding:4px}.pill{display:inline-block;border:1px solid #2b4658;border-radius:999px;padding:2px 7px;color:#9eb4c4}
 @media(max-width:1200px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.forecast-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:850px){.wrap{padding:13px}.header{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.forecast-grid{grid-template-columns:1fr}.chart-wrap{height:500px}.small-chart{height:390px}.valuation-main-chart{height:430px}.metric-note,.event-head{flex-direction:column;align-items:flex-start}.event-filters{width:100%}.event-filters select{flex:1}.metric-current{white-space:normal}.navigator{margin:0 18px}.nav{overflow:auto}.nav button{white-space:nowrap}}
+@media(max-width:850px){.wrap{padding:13px}.header{align-items:flex-start;flex-direction:column}.stock-row{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.forecast-grid{grid-template-columns:1fr}.chart-wrap{height:500px}.small-chart{height:390px}.valuation-main-chart{height:430px}.metric-note,.event-head{flex-direction:column;align-items:flex-start}.event-filters{width:100%}.event-filters select{flex:1}.metric-current{white-space:normal}.navigator{margin:0 18px}.nav{overflow:auto}.nav button{white-space:nowrap}}
 </style></head><body><main class="wrap">
-<header class="header"><div><h1>紫金矿业 <span class="muted" style="font-weight:500">601899.SH</span></h1><div class="muted">价格、盈利、估值与预期的连续跟踪面板</div></div><div class="badge">数据截至 2026-06-12</div></header>
+<header class="header"><div><h1><span id="stockName">多股票</span> <span id="stockCode" class="muted" style="font-weight:500"></span></h1><div class="muted">价格、盈利、估值与预期的连续跟踪面板</div></div><div id="dataBadge" class="badge">数据截至 -</div></header>
+<section class="stock-panel" aria-label="股票池">
+ <div class="stock-row">
+  <div><div class="label">股票池勾选</div><div id="stockChecks" class="stock-checks"></div></div>
+  <div><div class="label">当前查看</div><div id="stockTabs" class="stock-tabs"></div></div>
+ </div>
+</section>
 <nav class="nav"><button class="active" data-page="overview">总览</button><button data-page="valuation">估值</button><button data-page="retail">情绪·散户</button><button data-page="bigmoney">情绪·大资金</button><button data-page="official">情绪·官方</button></nav>
 
 <section id="overview" class="page active">
@@ -713,7 +733,7 @@ table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th,td{t
 </section>
 
 <section id="valuation" class="page">
-<div class="module-head"><div class="eyebrow">MODULE 01 / VALUATION</div><h2>估值</h2><div class="muted">连续数据看估值位置，并结合盈利周期理解市场为紫金矿业支付的价格。</div></div>
+<div class="module-head"><div class="eyebrow">MODULE 01 / VALUATION</div><h2>估值</h2><div class="muted">连续数据看估值位置，并结合盈利周期理解市场为当前股票支付的价格。</div></div>
 <div class="panel valuation-panel">
  <div class="valuation-panel-head"><div class="toolbar"><div><h2 id="valuationChartTitle" class="section-title">PE(TTM) 长期走势</h2><div class="hint">横轴为交易日期，按日连续展示</div></div><div class="group" id="valuationRanges"><button data-y="3">3年</button><button data-y="5">5年</button><button data-y="10" class="active">10年</button><button data-y="0">全部</button></div></div></div>
  <div class="valuation-panel-body">
@@ -800,8 +820,20 @@ table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th,td{t
 </section>
 <div class="foot">数据源：Tushare。机构盈利预测是统计汇总，不代表公司指引或投资建议；历史分位受盈利周期和会计口径变化影响。</div>
 </main><script>
-const MODEL=__MODEL__;
-const DATA=MODEL.series,L=MODEL.latest,COLORS={p:'#42d3ff',n:'#ffb547',pe:'#c792ff',pb:'#42d3ff',dy:'#40df9a'};
+const MODELS=__MODELS__;
+const STOCK_CODES=Object.keys(MODELS);
+let activeCode=STOCK_CODES[0];
+let visibleCodes=new Set(STOCK_CODES);
+let MODEL=MODELS[activeCode],DATA=MODEL.series,L=MODEL.latest;
+const COLORS={p:'#42d3ff',n:'#ffb547',pe:'#c792ff',pb:'#42d3ff',dy:'#40df9a'};
+function renderStockControls(){
+ if(!visibleCodes.has(activeCode)){activeCode=[...visibleCodes][0]||STOCK_CODES[0];MODEL=MODELS[activeCode];DATA=MODEL.series;L=MODEL.latest}
+ stockChecks.innerHTML=STOCK_CODES.map(code=>`<label class="stock-check"><input type="checkbox" data-stock-check="${code}" ${visibleCodes.has(code)?'checked':''}>${MODELS[code].meta.name}<span class="muted">${code}</span></label>`).join('');
+ stockTabs.innerHTML=STOCK_CODES.filter(code=>visibleCodes.has(code)).map(code=>`<button data-stock-tab="${code}" class="${code===activeCode?'active':''}">${MODELS[code].meta.name}</button>`).join('');
+ document.querySelectorAll('[data-stock-check]').forEach(input=>input.onchange=()=>{if(input.checked)visibleCodes.add(input.dataset.stockCheck);else if(visibleCodes.size>1)visibleCodes.delete(input.dataset.stockCheck);else input.checked=true;renderStockControls();if(!visibleCodes.has(activeCode))switchStock([...visibleCodes][0]);});
+ document.querySelectorAll('[data-stock-tab]').forEach(button=>button.onclick=()=>switchStock(button.dataset.stockTab));
+}
+function switchStock(code){if(!MODELS[code])return;activeCode=code;MODEL=MODELS[code];DATA=MODEL.series;L=MODEL.latest;renderStockControls();renderDashboard()}
 function setActiveNav(name){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===name))}
 function goToSection(name,behavior='smooth'){const target=document.getElementById(name)||overview;setActiveNav(target.id);target.scrollIntoView({behavior,block:'start'});setTimeout(()=>{drawOverview();drawValuation();drawRetail();drawBig();drawOfficial()},50)}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{history.replaceState(null,'','#'+b.dataset.page);goToSection(b.dataset.page)});
@@ -844,7 +876,7 @@ metricButtons.onclick=e=>{if(!e.target.dataset.metric)return;metric=e.target.dat
 valuationRanges.onclick=e=>{if(e.target.dataset.y===undefined)return;vy=+e.target.dataset.y;valuationRanges.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===e.target));drawValuation()};
 valuationChart.onmousemove=e=>{const r=valuationChart.getBoundingClientRect(),map=valuationChart._map;if(!map)return;const i=Math.max(0,Math.min(valuationView.length-1,Math.round((e.clientX-r.left-map.m.l)/map.cw*(valuationView.length-1)))),d=valuationView[i];valuationTip.innerHTML=`<b>${d.d}</b><br><span style="color:${metricColors[metric]}">${metricLabels[metric]}：${d[metric].toFixed(2)} ${metricUnits[metric]}</span>`;valuationTip.style.display='block';valuationTip.style.left=Math.min(r.width-190,Math.max(8,e.clientX-r.left+12))+'px';valuationTip.style.top=Math.max(8,e.clientY-r.top-55)+'px'};valuationChart.onmouseleave=()=>valuationTip.style.display='none';
 
-const HOLDERS=MODEL.holders;
+let HOLDERS=MODEL.holders;
 let retailMetric='turn',retailYears=3,retailView=[];
 const retailLabels={turn:'换手率',amount:'成交额',small:'小单净流入',rzye:'融资余额',rzbuy:'融资买入占比',holders:'股东户数'};
 const retailUnits={turn:'%',amount:'亿元',small:'亿元',rzye:'亿元',rzbuy:'%',holders:'万户'};
@@ -869,12 +901,12 @@ rMargin.textContent=L.rzye.toFixed(1)+' 亿元';rMarginHint.textContent='近20�
 rMarginBuy.textContent=L.rzbuy.toFixed(2)+'%';
 rHolders.textContent=latestHolder?(latestHolder.v/10000).toFixed(1)+' 万户':'暂无';rHolderHint.textContent=latestHolder?'截至 '+latestHolder.d+(previousHolder?'，较上期 '+((latestHolder.v/previousHolder.v-1)*100).toFixed(1)+'%':''):'';
 
-const HK=MODEL.hk_holds,FUNDS=MODEL.funds,INSTITUTIONS=MODEL.institutions;
+let HK=MODEL.hk_holds,FUNDS=MODEL.funds,INSTITUTIONS=MODEL.institutions;
 let bigMetric='large',bigYears=3,bigView=[];
 const bigLabels={large:'大单及超大单净额',hk:'沪股通持股比例',fund_count:'公募基金数量',fund_mkv:'公募基金持仓市值',fund_ratio:'基金流通占比',institution:'前十大机构流通占比'};
 const bigUnits={large:'亿元',hk:'%',fund_count:'只',fund_mkv:'亿元',fund_ratio:'%',institution:'%'};
 const bigColors={large:'#35bfff',hk:'#ffc84a',fund_count:'#c792ff',fund_mkv:'#40df9a',fund_ratio:'#68e0cf',institution:'#ff8a65'};
-const bigDescriptions={large:'大单及超大单净额反映大额交易资金的当日方向。',hk:'沪股通持股比例展示北向资金对紫金矿业的持仓变化。',fund_count:'持有紫金矿业的公募基金数量，按基金报告期汇总。',fund_mkv:'公募基金持有紫金矿业的合计市值，按报告期汇总。',fund_ratio:'各公募基金所持股份占流通股比例的合计值。',institution:'前十大流通股东中非个人股东的流通持股比例合计。'};
+const bigDescriptions={large:'大单及超大单净额反映大额交易资金的当日方向。',hk:'沪股通持股比例展示北向资金对当前股票的持仓变化。',fund_count:'持有当前股票的公募基金数量，按基金报告期汇总。',fund_mkv:'公募基金持有当前股票的合计市值，按报告期汇总。',fund_ratio:'各公募基金所持股份占流通股比例的合计值。',institution:'前十大流通股东中非个人股东的流通持股比例合计。'};
 function bigSource(){if(bigMetric==='large')return DATA.map(x=>({d:x.d,v:x.large}));if(bigMetric==='hk')return HK.map(x=>({d:x.d,v:x.ratio}));if(bigMetric==='fund_count')return FUNDS.map(x=>({d:x.d,v:x.count}));if(bigMetric==='fund_mkv')return FUNDS.map(x=>({d:x.d,v:x.mkv}));if(bigMetric==='fund_ratio')return FUNDS.map(x=>({d:x.d,v:x.float_ratio}));return INSTITUTIONS.map(x=>({d:x.d,v:x.ratio}))}
 function bigSlice(){const source=bigSource();if(!source.length)return [];const end=new Date(source.at(-1).d),start=new Date(end);start.setFullYear(end.getFullYear()-bigYears);return source.filter(x=>new Date(x.d)>=start)}
 function drawBig(){const canvas=bigChart;if(!canvas.offsetWidth)return;bigView=bigSlice();if(!bigView.length)return;const vals=bigView.map(x=>x.v),{ctx,w,h}=setupCanvas(canvas),m={l:68,r:25,t:25,b:44},cw=w-m.l-m.r,ch=h-m.t-m.b,ex=bigMetric==='large'?signedExt(vals):ext(vals,.1),x=i=>m.l+i/Math.max(1,bigView.length-1)*cw,y=v=>m.t+ch-(v-ex[0])/(ex[1]-ex[0])*ch;ctx.clearRect(0,0,w,h);ctx.font='11px Microsoft YaHei';ctx.textBaseline='middle';
@@ -893,7 +925,7 @@ bFundMkv.textContent=latestFund?latestFund.mkv.toFixed(1)+' 亿元':'暂无';bFu
 bFundRatio.textContent=latestFund?latestFund.float_ratio.toFixed(2)+'%':'暂无';
 bInstitution.textContent=latestInst?latestInst.ratio.toFixed(2)+'%':'暂无';bInstitutionHint.textContent=latestInst?'截至 '+latestInst.d+'，共 '+latestInst.count+' 家非个人股东':'';
 
-const OFFICIAL_HOLDS=MODEL.official_holds,REPURCHASES=MODEL.repurchases,HOLDER_TRADES=MODEL.holder_trades,LPR=MODEL.lpr;
+let OFFICIAL_HOLDS=MODEL.official_holds,REPURCHASES=MODEL.repurchases,HOLDER_TRADES=MODEL.holder_trades,LPR=MODEL.lpr;
 let officialMetric='official_hold',officialYears=10,officialView=[];
 const officialLabels={official_hold:'国家队/社保持股比例',repurchase:'累计回购金额',holder_trade:'重要股东累计增减持',lpr1:'1年期LPR',lpr5:'5年期LPR'};
 const officialUnits={official_hold:'%',repurchase:'亿元',holder_trade:'%',lpr1:'%',lpr5:'%'};
@@ -929,25 +961,70 @@ setupEventFilter(MODEL.sentiment_events,retailEventYear,retailEventQuarter,senti
 setupEventFilter(MODEL.big_events,bigEventYear,bigEventQuarter,bigEvents);
 setupEventFilter(MODEL.official_events,officialEventYear,officialEventQuarter,officialEvents);
 reports.innerHTML=MODEL.reports.map(x=>`<tr><td>${x.date.slice(0,4)}-${x.date.slice(4,6)}-${x.date.slice(6)}</td><td>${x.org}</td><td>${x.title}</td><td><span class="pill">${x.rating}</span></td></tr>`).join('');
-addEventListener('resize',()=>{drawOverview();drawValuation();drawRetail();drawBig();drawOfficial()});drawOverview();drawValuation();drawRetail();drawBig();drawOfficial();
+function renderDashboard(){
+ MODEL=MODELS[activeCode];DATA=MODEL.series;L=MODEL.latest;HOLDERS=MODEL.holders;HK=MODEL.hk_holds;FUNDS=MODEL.funds;INSTITUTIONS=MODEL.institutions;OFFICIAL_HOLDS=MODEL.official_holds;REPURCHASES=MODEL.repurchases;HOLDER_TRADES=MODEL.holder_trades;LPR=MODEL.lpr;
+ stockName.textContent=MODEL.meta.name;stockCode.textContent=MODEL.meta.code;dataBadge.textContent='数据截至 '+MODEL.meta.latest_date;
+ addPercentile('pe','pe_pct');addPercentile('pb','pb_pct');
+ lastPrice.textContent=L.p.toFixed(2)+' 元';lastProfit.textContent=L.n.toFixed(2)+' 亿元';lastPe.textContent=L.pe.toFixed(2)+' 倍';
+ const ret=(L.p/DATA[0].p-1)*100;return10y.textContent=(ret>=0?'+':'')+ret.toFixed(1)+'%';return10y.style.color=ret>=0?'var(--green)':'var(--red)';
+ vPe.textContent=L.pe.toFixed(2)+' 倍';vPePct.textContent='十年 '+L.pe_pct+'% 分位';
+ vPb.textContent=L.pb.toFixed(2)+' 倍';vPbPct.textContent='十年 '+L.pb_pct+'% 分位';
+ vDy.textContent=L.dy.toFixed(2)+'%';vDyPct.textContent='十年 '+L.dy_pct+'% 分位';
+ targetPrice.textContent=MODEL.target.median?MODEL.target.median.toFixed(2)+' 元':'暂无';targetHint.textContent=MODEL.target.count?MODEL.target.count+' 家机构，区间 '+MODEL.target.low+'–'+MODEL.target.high+' 元':'近期无目标价样本';
+ const last20=DATA.slice(-20),avg=(rows,k)=>rows.reduce((s,x)=>s+x[k],0)/Math.max(1,rows.length),latestHolder=HOLDERS.at(-1),previousHolder=HOLDERS.at(-2);
+ rTurn.textContent=L.turn.toFixed(2)+'%';rTurnHint.textContent='近20日均值 '+avg(last20,'turn').toFixed(2)+'%';
+ rAmount.textContent=L.amount.toFixed(1)+' 亿元';rAmountHint.textContent='近20日均值 '+avg(last20,'amount').toFixed(1)+' 亿元';
+ rSmall.textContent=(L.small>=0?'+':'')+L.small.toFixed(2)+' 亿元';rSmall.style.color=L.small>=0?'var(--green)':'var(--red)';
+ rMargin.textContent=L.rzye.toFixed(1)+' 亿元';rMarginHint.textContent='近20日变化 '+(DATA.at(-20)?.rzye?((L.rzye/DATA.at(-20).rzye-1)*100).toFixed(1)+'%':'暂无');
+ rMarginBuy.textContent=L.rzbuy.toFixed(2)+'%';
+ rHolders.textContent=latestHolder?(latestHolder.v/10000).toFixed(1)+' 万户':'暂无';rHolderHint.textContent=latestHolder?'截至 '+latestHolder.d+(previousHolder?'，较上期 '+((latestHolder.v/previousHolder.v-1)*100).toFixed(1)+'%':''):'';
+ const latestHk=HK.at(-1),previousHk=HK.at(-2),latestFund=FUNDS.at(-1),comparableFund=latestFund?[...FUNDS.slice(0,-1)].reverse().find(x=>x.d.slice(5)===latestFund.d.slice(5)):null,latestInst=INSTITUTIONS.at(-1);
+ bLarge.textContent=(L.large>=0?'+':'')+L.large.toFixed(2)+' 亿元';bLarge.style.color=L.large>=0?'var(--green)':'var(--red)';
+ bHk.textContent=latestHk?latestHk.ratio.toFixed(2)+'%':'暂无';bHkHint.textContent=latestHk?'截至 '+latestHk.d+(previousHk?'，较上期 '+(latestHk.ratio-previousHk.ratio).toFixed(2)+'pct':''):'';
+ bFundCount.textContent=latestFund?latestFund.count+' 只':'暂无';bFundCountHint.textContent=latestFund?'截至 '+latestFund.d+(comparableFund?'，同比 '+(latestFund.count-comparableFund.count)+' 只':''):'';
+ bFundMkv.textContent=latestFund?latestFund.mkv.toFixed(1)+' 亿元':'暂无';bFundMkvHint.textContent=latestFund?'合计持股 '+latestFund.amount.toFixed(2)+' 亿股':'';
+ bFundRatio.textContent=latestFund?latestFund.float_ratio.toFixed(2)+'%':'暂无';
+ bInstitution.textContent=latestInst?latestInst.ratio.toFixed(2)+'%':'暂无';bInstitutionHint.textContent=latestInst?'截至 '+latestInst.d+'，共 '+latestInst.count+' 家非个人股东':'';
+ const latestRepurchase=REPURCHASES.at(-1),latestTrade=HOLDER_TRADES.at(-1),latestOfficial=OFFICIAL_HOLDS.at(-1),latestLpr=LPR.at(-1);
+ oRepurchase.textContent=latestRepurchase?latestRepurchase.amount.toFixed(2)+' 亿元':'暂无';oRepurchaseHint.textContent=latestRepurchase?latestRepurchase.proc+'，公告日 '+latestRepurchase.d:'近十年无回购记录';
+ oHolderTrade.textContent=latestTrade?(latestTrade.ratio>=0?'+':'')+latestTrade.ratio.toFixed(2)+'%':'暂无';oHolderTrade.style.color=latestTrade&&latestTrade.ratio>=0?'var(--green)':'var(--red)';oHolderTradeHint.textContent=latestTrade?'最近：'+latestTrade.holder:'近十年无重要股东增减持记录';
+ oOfficialHold.textContent=latestOfficial?latestOfficial.ratio.toFixed(2)+'%':'暂无';oOfficialHoldHint.textContent=latestOfficial?'截至 '+latestOfficial.d+'，'+latestOfficial.count+' 个账户':'前十大股东未发现国家队/社保';
+ oLpr.textContent=latestLpr?latestLpr.y1.toFixed(2)+'% / '+latestLpr.y5.toFixed(2)+'%':'暂无';oLprHint.textContent=latestLpr?'截至 '+latestLpr.d:'';
+ forecastGrid.innerHTML=Object.entries(MODEL.consensus).map(([year,x])=>`<div class="forecast"><div class="label">${year} 年</div><strong>${x.forward_pe?.toFixed(2)??'-'} 倍 PE</strong><div class="bar"><span style="width:${Math.min(100,((x.eps||0)/5)*100)}%"></span></div><div>EPS 中位数 ${x.eps?.toFixed(2)??'-'} 元</div><div class="hint">${x.count} 家机构｜区间 ${x.eps_low??'-'}–${x.eps_high??'-'} 元<br>净利润中位数 ${x.np?.toFixed(0)??'-'} 亿元</div></div>`).join('');
+ setupEventFilter(MODEL.events,valuationEventYear,valuationEventQuarter,events);
+ setupEventFilter(MODEL.sentiment_events,retailEventYear,retailEventQuarter,sentimentEvents);
+ setupEventFilter(MODEL.big_events,bigEventYear,bigEventQuarter,bigEvents);
+ setupEventFilter(MODEL.official_events,officialEventYear,officialEventQuarter,officialEvents);
+ reports.innerHTML=MODEL.reports.length?MODEL.reports.map(x=>`<tr><td>${x.date.slice(0,4)}-${x.date.slice(4,6)}-${x.date.slice(6)}</td><td>${x.org}</td><td>${x.title}</td><td><span class="pill">${x.rating}</span></td></tr>`).join(''):'<tr><td colspan="4" class="muted">近期暂无机构观点样本</td></tr>';
+ drawOverview();drawValuation();drawRetail();drawBig();drawOfficial();
+}
+addEventListener('resize',()=>{drawOverview();drawValuation();drawRetail();drawBig();drawOfficial()});renderStockControls();renderDashboard();
 </script></body></html>"""
 
 
 def main():
-    model = build_data(get_token())
+    token = get_token()
+    models = {}
+    for stock in STOCKS:
+        print(f"building {stock['name']} {stock['code']}...")
+        models[stock["code"]] = build_data(token, stock)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     html = HTML.replace(
-        "__MODEL__", json.dumps(model, ensure_ascii=False, separators=(",", ":"))
+        "__MODELS__", json.dumps(models, ensure_ascii=False, separators=(",", ":"))
     )
     OUTPUT.write_text(html, encoding="utf-8")
     print(
         json.dumps(
             {
                 "output": str(OUTPUT),
-                "points": len(model["series"]),
-                "latest": model["latest"],
-                "consensus": model["consensus"],
-                "target": model["target"],
+                "stocks": {
+                    code: {
+                        "name": model["meta"]["name"],
+                        "latest": model["latest"],
+                        "points": len(model["series"]),
+                    }
+                    for code, model in models.items()
+                },
             },
             ensure_ascii=False,
         )
