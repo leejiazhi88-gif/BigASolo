@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "outputs" / "index.html"
 START_DATE = "20160613"
-END_DATE = "20260708"
+END_DATE = "20260714"
 STOCKS = [
     {"code": "601899.SH", "name": "紫金矿业"},
     {"code": "600036.SH", "name": "招商银行"},
@@ -205,7 +205,8 @@ def build_data(token, stock):
         factor = factor_by_date.get(row["trade_date"])
         amount = amount_by_date.get(row["trade_date"]) or 0
         moneyflow = moneyflow_by_date.get(row["trade_date"], {})
-        margin = margin_by_date.get(row["trade_date"], {})
+        margin = margin_by_date.get(row["trade_date"])
+        previous_margin_balance = series[-1]["rzye"] if series else 0
         if not pe or pe <= 0 or not pb or pb <= 0 or not market_cap or not factor:
             continue
         series.append(
@@ -233,12 +234,12 @@ def build_data(token, stock):
                     / 10000,
                     3,
                 ),
-                "rzye": round((margin.get("rzye") or 0) / 100000000, 3),
-                "rzbuy": round(
-                    (margin.get("rzmre") or 0) / (amount * 1000) * 100, 3
-                    if amount
-                    else 0,
-                ),
+                "rzye": round((margin.get("rzye") or 0) / 100000000, 3)
+                if margin
+                else previous_margin_balance,
+                "rzbuy": round((margin.get("rzmre") or 0) / (amount * 1000) * 100, 3)
+                if margin and amount
+                else 0,
             }
         )
     last_basic_date = max(basic_by_date)
@@ -393,14 +394,16 @@ def build_data(token, stock):
 
     holder_series = []
     seen_holder_dates = set()
-    for row in sorted(holders, key=lambda item: item["end_date"]):
+    for row in sorted(holders, key=lambda item: item.get("end_date") or ""):
+        if not row.get("end_date") or not row.get("holder_num"):
+            continue
         if row["end_date"] in seen_holder_dates:
             continue
         seen_holder_dates.add(row["end_date"])
         holder_series.append(
             {
                 "d": f"{row['end_date'][:4]}-{row['end_date'][4:6]}-{row['end_date'][6:]}",
-                "ann": row["ann_date"],
+                "ann": row.get("ann_date") or row["end_date"],
                 "v": row["holder_num"],
             }
         )
